@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.development.travellerhost.model.DocumentType;
 import com.development.travellerhost.model.Traveller;
 import com.development.travellerhost.model.TravellerDocument;
 
@@ -12,18 +13,21 @@ import java.util.Optional;
 
 @Repository
 public interface TravellerRepository extends JpaRepository<Traveller, Long> {
-	// Define a custom query method to check for duplicate email, mobile number, and documents
-    @Query(value = "SELECT COUNT(*) > 0 FROM traveller t " +
-            "INNER JOIN traveller_documents d ON t.id = d.traveller_id " +
-            "WHERE t.email = :email AND t.mobile_number = :mobileNumber " +
-            "AND d.id IN :documentIds", nativeQuery = true)
-    boolean existsByEmailMobileAndDocuments(
-            @Param("email") String email,
-            @Param("mobileNumber") String mobileNumber,
-            @Param("documentIds") List<Long> documentIds);
     Optional<Traveller> findByEmailAndMobileNumber(String email, String mobileNumber);
     boolean existsByEmailAndMobileNumberAndDocumentsId(String email, String mobileNumber, Long documentId);
-
+        @Query("SELECT DISTINCT t FROM Traveller t JOIN t.documents d " +
+                "WHERE (:email IS NULL OR t.email = :email) " +
+                "AND (:mobile IS NULL OR t.mobileNumber = :mobile) " +
+                "AND (:documentType IS NULL OR d.documentType = :documentType) " +
+                "AND (:documentNumber IS NULL OR d.documentNumber = :documentNumber) " +
+                "AND (:issuingCountry IS NULL OR d.issuingCountry = :issuingCountry) " +
+                "AND d.active = true" )
+        List<Traveller> searchActiveTravellers(
+                @Param("email") String email,
+                @Param("mobile") String mobile,
+                @Param("documentType") DocumentType documentType,
+                @Param("documentNumber") String documentNumber,
+                @Param("issuingCountry") String issuingCountry);
     
-
 }
+    

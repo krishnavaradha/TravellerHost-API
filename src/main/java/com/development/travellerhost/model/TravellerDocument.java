@@ -77,13 +77,11 @@ public class TravellerDocument {
 		this.traveller = traveller;
 	}
 
-	public TravellerDocument(DocumentType documentType, String documentNumber, String issuingCountry,
-			Traveller traveller) {
+	public TravellerDocument(DocumentType documentType, String documentNumber, String issuingCountry) {
 		super();
 		this.documentType = documentType;
 		this.documentNumber = documentNumber;
 		this.issuingCountry = issuingCountry;
-		this.traveller = traveller;
 	}
 
 	public TravellerDocument() {

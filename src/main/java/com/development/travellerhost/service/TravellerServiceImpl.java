@@ -6,11 +6,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.io.PrintWriter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import com.development.traveller.customexception.DuplicateResourceException;
 import com.development.travellerhost.dao.TravellerDocumentRepository;
 import com.development.travellerhost.dao.TravellerRepository;
+import com.development.travellerhost.model.DocumentType;
 import com.development.travellerhost.model.Traveller;
 import com.development.travellerhost.model.TravellerDocument;
 
@@ -63,7 +65,13 @@ public class TravellerServiceImpl implements TravellerService {
 				// Return the saved traveler
 				return savedTraveller;
 			}
-		} catch (Exception ex) {			
+		}
+			catch (DataIntegrityViolationException ex) {
+		        // Catch the specific exception for unique constraint violation
+		        ex.printStackTrace(System.out);
+		        throw new DuplicateResourceException("Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
+		    } 
+		catch (Exception ex) {			
 			throw new RuntimeException("Failed to create traveler: " + ex.getMessage());
 		}
 	}
@@ -101,10 +109,6 @@ public class TravellerServiceImpl implements TravellerService {
 		}
 	}
 
-	private boolean isDuplicateEmailMobileAndDocuments(String email, String mobileNumber, List<Long> documentIds) {
-		return travellerRepository.existsByEmailMobileAndDocuments(email, mobileNumber, documentIds);
-	}
-
 	private boolean isCombinationUnique(Traveller traveller) {
 		Set<String> documentCombinations = new HashSet<>();
 
@@ -123,4 +127,12 @@ public class TravellerServiceImpl implements TravellerService {
 
 		return true;
 	}
+	
+	
+	@Override
+    public List<Traveller> searchActiveTravellers(String email, String mobile,
+                                                  DocumentType documentType, String documentNumber,
+                                                  String issuingCountry) {
+        return travellerRepository.searchActiveTravellers(email, mobile, documentType, documentNumber, issuingCountry);
+    }
 }
