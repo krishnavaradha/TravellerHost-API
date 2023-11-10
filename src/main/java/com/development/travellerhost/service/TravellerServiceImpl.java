@@ -1,20 +1,27 @@
 package com.development.travellerhost.service;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.io.PrintWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.apache.commons.lang3.StringUtils;
 
 import com.development.traveller.customexception.DuplicateResourceException;
+import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
+import com.development.traveller.customexception.TravellerNotFoundException;
 import com.development.travellerhost.dao.TravellerDocumentRepository;
 import com.development.travellerhost.dao.TravellerRepository;
 import com.development.travellerhost.model.DocumentType;
 import com.development.travellerhost.model.Traveller;
 import com.development.travellerhost.model.TravellerDocument;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class TravellerServiceImpl implements TravellerService {
@@ -37,12 +44,19 @@ public class TravellerServiceImpl implements TravellerService {
 
 			if (existingTraveller.isPresent()) {
 				Traveller existing = existingTraveller.get();
-				if (!isCombinationUnique(existing)) {
+				if (!isCombinationUnique(traveller)) {
 					throw new DuplicateResourceException(
 							"Email, Mobile Number, and Document combination is not unique.");
 				}
 				updateExistingTraveller(existing, traveller.getDocuments());
-				return travellerRepository.save(existing);
+				Traveller savedTraveller = travellerRepository.save(existing);
+				// Add the new documents to the existing traveler's documents list
+				traveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
+				travellerDocumentRepository.saveAll(traveller.getDocuments());
+
+				// Return the saved traveler
+				return savedTraveller;
+
 			} else {
 
 				// Save the traveler to generate an ID
@@ -65,13 +79,12 @@ public class TravellerServiceImpl implements TravellerService {
 				// Return the saved traveler
 				return savedTraveller;
 			}
-		}
-			catch (DataIntegrityViolationException ex) {
-		        // Catch the specific exception for unique constraint violation
-		        ex.printStackTrace(System.out);
-		        throw new DuplicateResourceException("Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
-		    } 
-		catch (Exception ex) {			
+		} catch (DataIntegrityViolationException ex) {
+			// Catch the specific exception for unique constraint violation
+			ex.printStackTrace(System.out);
+			throw new DuplicateResourceException(
+					"Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
+		} catch (Exception ex) {
 			throw new RuntimeException("Failed to create traveler: " + ex.getMessage());
 		}
 	}
@@ -80,16 +93,23 @@ public class TravellerServiceImpl implements TravellerService {
 		existing.setFirstName(existing.getFirstName());
 		existing.setLastName(existing.getLastName());
 		existing.setDateOfBirth(existing.getDateOfBirth());
-		existing.setDocuments(newDocuments);
+
+		// Preserve existing documents and add new documents
+		List<TravellerDocument> allDocuments = new ArrayList<>();
+		if (existing.getDocuments() != null) {
+			allDocuments.addAll(existing.getDocuments());
+		}
+		allDocuments.addAll(newDocuments);
+		existing.setDocuments(allDocuments);
 
 		// If there's only one document and none of them are marked as active, set the
 		// first one as active
-		if (newDocuments.size() == 1 && !isAtLeastOneDocumentActive(newDocuments)) {
-			newDocuments.iterator().next().setActive(true);
-		} else if (isAtLeastOneDocumentActive(newDocuments)) {
-			deactivateOtherDocumentsForTraveler(existing, newDocuments);
+		if (allDocuments.size() == 1 && !isAtLeastOneDocumentActive(allDocuments)) {
+			allDocuments.iterator().next().setActive(true);
+		} else if (isAtLeastOneDocumentActive(allDocuments)) {
+			deactivateOtherDocumentsForTraveler(existing, allDocuments);
 		} else {
-			markAtLeastOneDocumentAsActive(newDocuments);
+			markAtLeastOneDocumentAsActive(allDocuments);
 		}
 	}
 
@@ -127,12 +147,60 @@ public class TravellerServiceImpl implements TravellerService {
 
 		return true;
 	}
-	
-	
+
 	@Override
-    public List<Traveller> searchActiveTravellers(String email, String mobile,
-                                                  DocumentType documentType, String documentNumber,
-                                                  String issuingCountry) {
-        return travellerRepository.searchActiveTravellers(email, mobile, documentType, documentNumber, issuingCountry);
-    }
+	public Traveller searchActiveTravellers(String email, String mobile, DocumentType documentType,
+			String documentNumber, String issuingCountry) {
+		List<TravellerDocument> filteredResult = new ArrayList<>();
+		if (StringUtils.isAllBlank(email, mobile, documentNumber, issuingCountry) && documentType == null) {
+			throw new IllegalArgumentException("At least one search criteria must be provided.");
+
+		}
+
+		// Perform the search for active travelers
+		Traveller traveller = travellerRepository.searchActiveTravellers(email, mobile, documentType, documentNumber,
+				issuingCountry);
+		System.out.println("search traveller " + traveller);
+		if (traveller == null || (traveller != null && !traveller.getActive())) {
+			throw new TravellerNotFoundException("Traveller Account is Deactivated or Not Found");
+		}
+
+		boolean isActiveTraveller = traveller.isActive();
+
+		for (TravellerDocument document : traveller.getDocuments()) {
+			if (isActiveTraveller && document.isActive()) {
+				filteredResult.add(document);
+			}
+
+		}
+		traveller.setDocuments(filteredResult);
+		return traveller;
+
+	}
+
+	@Override
+	@Transactional
+	public Traveller deactivateTraveller(String firstName, String lastName, String dateOfBirth, String email,
+			String mobileNumber) throws TravellerAlreadyDeactivatedException {
+		if (email == null || mobileNumber == null) {
+			throw new IllegalArgumentException("Email and Mobile Number is mandatory");
+		}
+
+		List<Traveller> travellers = travellerRepository.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(
+				firstName, lastName, dateOfBirth, email, mobileNumber);
+
+		if (travellers.isEmpty()) {
+			throw new TravellerNotFoundException("Traveller not found with the given information");
+		}
+
+		Traveller traveller = travellers.get(0);
+
+		if (!traveller.isActive()) {
+			throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
+		}
+
+		traveller.setActive(false);
+		return travellerRepository.save(traveller);
+	}
+
 }

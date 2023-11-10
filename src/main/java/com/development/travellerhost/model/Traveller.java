@@ -18,6 +18,8 @@ public class Traveller {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
+	@Column(name = "active")
+	private Boolean active=true;
 	private String firstName;
 	private String lastName;
 	private String dateOfBirth;
@@ -85,5 +87,11 @@ public class Traveller {
 	public void setDocuments(List<TravellerDocument> documents) {
 		this.documents = documents;
 	}
+
+	public boolean isActive() {
+		
+		return active;
+	}
+
 
 }
