@@ -14,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.development.traveller.customexception.DuplicateResourceException;
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
+import com.development.traveller.customexception.TravellerAlredyExistsException;
 import com.development.traveller.customexception.TravellerNotFoundException;
 import com.development.travellerhost.dao.TravellerDocumentRepository;
 import com.development.travellerhost.dao.TravellerRepository;
@@ -43,22 +44,9 @@ public class TravellerServiceImpl implements TravellerService {
 					traveller.getMobileNumber());
 
 			if (existingTraveller.isPresent()) {
-				Traveller existing = existingTraveller.get();
-				if (!isCombinationUnique(traveller)) {
-					throw new DuplicateResourceException(
-							"Email, Mobile Number, and Document combination is not unique.");
-				}
-				updateExistingTraveller(existing, traveller.getDocuments());
-				Traveller savedTraveller = travellerRepository.save(existing);
-				// Add the new documents to the existing traveler's documents list
-				traveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
-				travellerDocumentRepository.saveAll(traveller.getDocuments());
-
-				// Return the saved traveler
-				return savedTraveller;
-
-			} else {
-
+				throw new TravellerAlredyExistsException("Traveller alredy exists, Failed to create traveller "); 
+				} else {
+					
 				// Save the traveler to generate an ID
 				Traveller savedTraveller = travellerRepository.save(traveller);
 
@@ -80,8 +68,7 @@ public class TravellerServiceImpl implements TravellerService {
 				return savedTraveller;
 			}
 		} catch (DataIntegrityViolationException ex) {
-			// Catch the specific exception for unique constraint violation
-			ex.printStackTrace(System.out);
+			
 			throw new DuplicateResourceException(
 					"Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
 		} catch (Exception ex) {
@@ -90,26 +77,44 @@ public class TravellerServiceImpl implements TravellerService {
 	}
 
 	private void updateExistingTraveller(Traveller existing, List<TravellerDocument> newDocuments) {
-		existing.setFirstName(existing.getFirstName());
-		existing.setLastName(existing.getLastName());
-		existing.setDateOfBirth(existing.getDateOfBirth());
+		
 
-		// Preserve existing documents and add new documents
-		List<TravellerDocument> allDocuments = new ArrayList<>();
-		if (existing.getDocuments() != null) {
-			allDocuments.addAll(existing.getDocuments());
-		}
-		allDocuments.addAll(newDocuments);
-		existing.setDocuments(allDocuments);
+		// Merge existing documents with new documents
+	    List<TravellerDocument> updatedDocuments = new ArrayList<>(existing.getDocuments());
 
+	    for (TravellerDocument newDocument : newDocuments) {
+	        Optional<TravellerDocument> existingDocumentOpt = 
+	                existing.getDocuments().stream()
+	                        .filter(doc ->
+	                                doc.getDocumentType().equals(newDocument.getDocumentType()) &&
+	                                doc.getDocumentNumber().equals(newDocument.getDocumentNumber()) &&
+	                                doc.getIssuingCountry().equals(newDocument.getIssuingCountry())
+	                        )
+	                        .findFirst();
+
+	        if (existingDocumentOpt.isPresent()) {
+	            // Update properties of existing document
+	            TravellerDocument existingDocument = existingDocumentOpt.get();
+	            existingDocument.setDocumentType(newDocument.getDocumentType());
+	            existingDocument.setDocumentNumber(newDocument.getDocumentNumber());
+	            existingDocument.setIssuingCountry(newDocument.getIssuingCountry());
+	            existingDocument.setActive(newDocument.isActive());
+	        } else {
+	            // Add new document with correct traveler reference
+	            newDocument.setTraveller(existing);
+	            updatedDocuments.add(newDocument);
+	        }
+	    }
+	    // Set the updated documents
+	    existing.setDocuments(updatedDocuments);
 		// If there's only one document and none of them are marked as active, set the
 		// first one as active
-		if (allDocuments.size() == 1 && !isAtLeastOneDocumentActive(allDocuments)) {
-			allDocuments.iterator().next().setActive(true);
-		} else if (isAtLeastOneDocumentActive(allDocuments)) {
-			deactivateOtherDocumentsForTraveler(existing, allDocuments);
+		if (updatedDocuments.size() == 1 && !isAtLeastOneDocumentActive(updatedDocuments)) {
+			updatedDocuments.iterator().next().setActive(true);
+		} else if (isAtLeastOneDocumentActive(updatedDocuments)) {
+			deactivateOtherDocumentsForTraveler(existing, updatedDocuments);
 		} else {
-			markAtLeastOneDocumentAsActive(allDocuments);
+			markAtLeastOneDocumentAsActive(updatedDocuments);
 		}
 	}
 
@@ -201,6 +206,54 @@ public class TravellerServiceImpl implements TravellerService {
 
 		traveller.setActive(false);
 		return travellerRepository.save(traveller);
+	}
+
+	@Override
+	public Traveller updateTraveller(Traveller newTraveller) throws TravellerAlreadyDeactivatedException {
+	    try {
+	    	if (!isCombinationUnique(newTraveller)) {
+				throw new DuplicateResourceException(
+						"Email, Mobile Number, and Document combination is not unique in the request.");
+			}
+	        Optional<Traveller> existingTraveller = travellerRepository.findByEmailAndMobileNumber(newTraveller.getEmail(),
+	                newTraveller.getMobileNumber());
+	        if (!existingTraveller.isPresent()) {
+	            throw new TravellerNotFoundException("Traveller not found with the provided details.");
+	        }	        
+	            Traveller existing = existingTraveller.get();
+
+	            // Check if the existing traveler is active
+	            if (!existing.isActive()) {
+	                throw new TravellerAlreadyDeactivatedException("Deactivated travelers cannot be updated.");
+	            }
+	            existing.setFirstName(newTraveller.getFirstName());
+	    		existing.setLastName(newTraveller.getLastName());
+	    		existing.setDateOfBirth(newTraveller.getDateOfBirth());
+	            // Update the existing traveler
+	            updateExistingTraveller(existing, newTraveller.getDocuments());
+
+	            // Save the existing traveler to update the changes
+	            Traveller savedTraveller = travellerRepository.save(existing);
+
+	            // Add the new documents to the existing traveler's documents list
+	            if (newTraveller.getDocuments() != null) {
+	                newTraveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
+	                travellerDocumentRepository.saveAll(newTraveller.getDocuments());
+	            }
+
+	            // Return the saved traveler
+	            return savedTraveller;
+	        
+	    } catch (TravellerAlreadyDeactivatedException e) {
+	        // Handle deactivated traveler exception
+	        throw e;
+	    } catch (DuplicateResourceException e) {
+	        // Handle duplicate resource exception
+	        throw e;
+	    } catch (Exception e) {
+	        // Handle other exceptions
+	        throw new RuntimeException("Failed to update traveler: " + e.getMessage(), e);
+	    }
 	}
 
 }

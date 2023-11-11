@@ -1,7 +1,5 @@
 package com.development.travellerhost.controller;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.development.traveller.customexception.DuplicateResourceException;
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
 import com.development.traveller.customexception.TravellerNotFoundException;
 import com.development.travellerhost.model.DocumentType;
@@ -53,13 +50,29 @@ public class TravellerhostController {
 					document.getDocumentType(), document.getDocumentNumber(), document.getIssuingCountry());
 			
 			return new ResponseEntity<>(traveller, HttpStatus.OK);
-		} catch (IllegalArgumentException | DuplicateResourceException e) {
-			return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-		} catch (Exception e) {
+		} 
+		 catch (TravellerNotFoundException e) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Traveller not found for the provided details.");
+			} catch (TravellerAlreadyDeactivatedException e) {
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Traveller is already deactivated.");
+			}catch (Exception e) {
 			return new ResponseEntity<>("An error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 	}
 
+	@PutMapping("/update")
+	public ResponseEntity<?> updateTraveller(@RequestBody Traveller traveller) {
+		try {
+			Traveller updatedTraveller = travellerService.updateTraveller(traveller);
+			return new ResponseEntity<>(updatedTraveller, HttpStatus.OK);
+		}  catch (TravellerNotFoundException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Traveller not found for the provided details.");
+		} catch (TravellerAlreadyDeactivatedException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Traveller is already deactivated.");
+		}catch (Exception e) {
+			return new ResponseEntity<>("An error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
 	@PutMapping("/deactivate")
 	public ResponseEntity<?> deactivateTraveller(@RequestBody TravellerDeactivationRequest request) {
 		try {
