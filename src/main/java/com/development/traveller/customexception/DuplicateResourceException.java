@@ -1,5 +1,5 @@
 package com.development.traveller.customexception;
-public class DuplicateResourceException extends RuntimeException {
+public class DuplicateResourceException extends Exception {
 
     /**
 	 * 

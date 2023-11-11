@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
+import com.development.traveller.customexception.TravellerAlredyExistsException;
 import com.development.traveller.customexception.TravellerNotFoundException;
 import com.development.travellerhost.dao.TravellerDocumentRepository;
 import com.development.travellerhost.dao.TravellerRepository;
@@ -48,7 +49,7 @@ class TravellerServiceImplTest {
 	}
 
 	@Test
-	void testCreateTraveller() {
+	void testCreateTraveller() throws TravellerAlredyExistsException {
 	
 
 		when(travellerRepository.findByEmailAndMobileNumber(any(), any())).thenReturn(Optional.empty());
@@ -65,7 +66,7 @@ class TravellerServiceImplTest {
 	}
 
 	@Test
-	void testCreateTravellerWithExistingTraveller() {
+	void testCreateTravellerWithExistingTraveller() throws TravellerAlredyExistsException {
 
 		Traveller existingTraveller = createSampleTraveller();
 		existingTraveller.setId(1L);

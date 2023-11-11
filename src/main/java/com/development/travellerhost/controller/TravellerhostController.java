@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
+import com.development.traveller.customexception.TravellerAlredyExistsException;
 import com.development.traveller.customexception.TravellerNotFoundException;
 import com.development.travellerhost.model.DocumentType;
 import com.development.travellerhost.model.Traveller;
@@ -34,63 +35,69 @@ public class TravellerhostController {
 		try {
 			Traveller createdTraveller = travellerService.createTraveller(traveller);
 			return new ResponseEntity<>(createdTraveller, HttpStatus.CREATED);
-		} catch (Exception e) {
+		}  catch (TravellerAlredyExistsException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		}catch (Exception e) {
 			return new ResponseEntity<>("An error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 	}
 
 	@GetMapping("/search")
-	public ResponseEntity<?> searchTravellers(@RequestParam(required = false) String email,
-			@RequestParam(required = false) String mobile, @RequestParam(required = false) DocumentType documentType,
-			@RequestParam(required = false) String documentNumber,
-			@RequestParam(required = false) String issuingCountry) {
-		try {
-			TravellerDocument document = new TravellerDocument(documentType, documentNumber, issuingCountry);
-			Traveller traveller= travellerService.searchActiveTravellers(email, mobile,
-					document.getDocumentType(), document.getDocumentNumber(), document.getIssuingCountry());
-			
-			return new ResponseEntity<>(traveller, HttpStatus.OK);
-		} 
-		 catch (TravellerNotFoundException e) {
-				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Traveller not found for the provided details.");
-			} catch (TravellerAlreadyDeactivatedException e) {
-				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Traveller is already deactivated.");
-			}catch (Exception e) {
-			return new ResponseEntity<>("An error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+	public ResponseEntity<?> searchTravellers(
+	        @RequestParam(required = false) String email,
+	        @RequestParam(required = false) String mobile,
+	        @RequestParam(required = false) DocumentType documentType,
+	        @RequestParam(required = false) String documentNumber,
+	        @RequestParam(required = false) String issuingCountry) {
+	    try {
+	        TravellerDocument document = new TravellerDocument(documentType, documentNumber, issuingCountry);
+	        Traveller traveller = travellerService.searchActiveTravellers(
+	                email, mobile, document.getDocumentType(), document.getDocumentNumber(), document.getIssuingCountry());
+
+	        return new ResponseEntity<>(traveller, HttpStatus.OK);
+	    } catch (TravellerNotFoundException | TravellerAlreadyDeactivatedException e) {
+	        return handleException(e);
+	    } catch (Exception e) {
+	        return handleException(new RuntimeException("An error occurred: " + e.getMessage(), e));
+	    }
 	}
 
 	@PutMapping("/update")
 	public ResponseEntity<?> updateTraveller(@RequestBody Traveller traveller) {
-		try {
-			Traveller updatedTraveller = travellerService.updateTraveller(traveller);
-			return new ResponseEntity<>(updatedTraveller, HttpStatus.OK);
-		}  catch (TravellerNotFoundException e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Traveller not found for the provided details.");
-		} catch (TravellerAlreadyDeactivatedException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Traveller is already deactivated.");
-		}catch (Exception e) {
-			return new ResponseEntity<>("An error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-		}
+	    try {
+	        Traveller updatedTraveller = travellerService.updateTraveller(traveller);
+	        return new ResponseEntity<>(updatedTraveller, HttpStatus.OK);
+	    } catch (TravellerNotFoundException | TravellerAlreadyDeactivatedException e) {
+	        return handleException(e);
+	    } catch (Exception e) {
+	        return handleException(new RuntimeException("An error occurred: " + e.getMessage(), e));
+	    }
 	}
+
 	@PutMapping("/deactivate")
 	public ResponseEntity<?> deactivateTraveller(@RequestBody TravellerDeactivationRequest request) {
-		try {
-			Traveller deactivatedTraveller = travellerService.deactivateTraveller(request.getFirstName(),
-					request.getLastName(), request.getDateOfBirth(), request.getEmail(), request.getMobileNumber());
+	    try {
+	        Traveller deactivatedTraveller = travellerService.deactivateTraveller(
+	                request.getFirstName(), request.getLastName(), request.getDateOfBirth(), request.getEmail(), request.getMobileNumber());
 
-			if (deactivatedTraveller != null) {
-				return new ResponseEntity<>(deactivatedTraveller, HttpStatus.OK);
-			} else {
-				return ResponseEntity.notFound().build();
-			}
-		} catch (TravellerNotFoundException e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Traveller not found for the provided details.");
-		} catch (TravellerAlreadyDeactivatedException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Traveller is already deactivated.");
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("An unexpected error occurred while processing the request." + e.getMessage());
-		}
+	        if (deactivatedTraveller != null) {
+	            return new ResponseEntity<>(deactivatedTraveller, HttpStatus.OK);
+	        } else {
+	            return ResponseEntity.notFound().build();
+	        }
+	    } catch (TravellerNotFoundException | TravellerAlreadyDeactivatedException e) {
+	        return handleException(e);
+	    } catch (Exception e) {
+	        return handleException(new RuntimeException("An error occurred: " + e.getMessage(), e));
+	    }
+	}
+	private ResponseEntity<?> handleException(Exception e) {
+	    HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+	    if (e instanceof TravellerNotFoundException) {
+	        status = HttpStatus.NOT_FOUND;
+	    } else if (e instanceof TravellerAlreadyDeactivatedException) {
+	        status = HttpStatus.BAD_REQUEST;
+	    }
+	    return ResponseEntity.status(status).body(e.getMessage());
 	}
 }
