@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -17,7 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import com.development.traveller.customexception.DuplicateResourceException;
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
 import com.development.traveller.customexception.TravellerAlredyExistsException;
 import com.development.traveller.customexception.TravellerNotFoundException;
@@ -123,6 +126,41 @@ class TravellerServiceImplTest {
 
 	    assertFalse(deactivatedTraveller.getActive());
 	}
+	@Test
+	void createTraveller_DataIntegrityViolationException() {
+	    // Arrange
+	    Traveller traveller = createSampleTraveller();
+	    when(travellerRepository.findByEmailAndMobileNumber(anyString(), anyString())).thenReturn(Optional.empty());
+	    when(travellerRepository.save(any(Traveller.class))).thenThrow(DataIntegrityViolationException.class);
+
+	    // Act & Assert
+	    TravellerAlredyExistsException exception = assertThrows(TravellerAlredyExistsException.class, () -> travellerService.createTraveller(traveller));
+	    assertEquals("Mobile number/Email Id already exists. Please use a different mobile number or Email Id.", exception.getMessage());
+	}
+	@Test
+    void searchActiveTravellers_TravellerNotFoundException() {
+        // Arrange
+        when(travellerRepository.searchActiveTravellers(anyString(), anyString(), any(DocumentType.class), anyString(), anyString()))
+                .thenReturn(null);
+
+        // Act & Assert
+        assertThrows(TravellerNotFoundException.class, () ->
+                travellerService.searchActiveTravellers("krishnavaradha@example.com", "1234567890", DocumentType.PASSPORT, "AB123", "Country"));
+    }
+	@Test
+    void searchActiveTravellers_SuccessfulSearch() throws TravellerNotFoundException {
+      
+        when(travellerRepository.searchActiveTravellers(anyString(), anyString(), any(DocumentType.class), anyString(), anyString()))
+                .thenReturn(traveller);
+
+        // Act
+        Traveller foundTraveller = travellerService.searchActiveTravellers("krishnavaradha@example.com", "1234567890", DocumentType.ID_CARD, "ABC123", "Austria");
+
+        // Assert
+        assertNotNull(foundTraveller);
+        assertEquals(traveller, foundTraveller);
+    }
+
 
 	private Traveller createSampleTraveller() {
 		Traveller traveller = new Traveller();

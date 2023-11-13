@@ -10,14 +10,20 @@ Welcome to the Traveller Data Management API! This API allows you to manage trav
 - [Contact](#contact)
 
 ## Getting Started
+Assumptions :
 
 To get started, ensure you have:
 - H2 database enabled in Server Mode. Refer to [H2 Database Tutorial](https://www.h2database.com/html/tutorial.html) for details.
-- SSL certificates configured, and a client cert set up for mutual TLS from the client. For immediate testing use the server.crt, client.pfx from src/main/resources for testing from localhost.
+- SSL certificates configured, and a client cert set up for mutual TLS from the client.
 - H2 instances and application instances can be scaled up and load-balanced using F5.
 - RestTemplate load-balancing is not required as this is a single microservice without external service calls. Feel free to extend the solution as needed.
-
+-In all the below endpoints Document Type is restricted to 
+	PASSPORT("Passport"),
+    ID_CARD("ID Card"),
+    DRIVER_LICENSE("Driver's License");
+    
 ## API Endpoints
+
 
 ### Create Traveller
 
