@@ -11,7 +11,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
+import lombok.Data;
+import lombok.NoArgsConstructor;
+@Data
+@NoArgsConstructor
 @Entity
 @Table(name = "TRAVELLER_DOCUMENTS")
 public class TravellerDocument {
@@ -28,65 +31,11 @@ public class TravellerDocument {
     @JoinColumn(name = "traveller_id")
     private Traveller traveller;
 
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
-	}
-
-	public DocumentType getDocumentType() {
-		return documentType;
-	}
-
-	public void setDocumentType(DocumentType documentType) {
-		this.documentType = documentType;
-	}
-
-	public String getDocumentNumber() {
-		return documentNumber;
-	}
-
-	public void setDocumentNumber(String documentNumber) {
-		this.documentNumber = documentNumber;
-	}
-
-	public String getIssuingCountry() {
-		return issuingCountry;
-	}
-
-	public void setIssuingCountry(String issuingCountry) {
-		this.issuingCountry = issuingCountry;
-	}
-
-	public boolean isActive() {
-		return active;
-	}
-
-	public void setActive(boolean active) {
-		this.active = active;
-	}
-
-	public Traveller getTraveller() {
-		return traveller;
-	}
-
-	public void setTraveller(Traveller traveller) {
-		this.traveller = traveller;
-	}
-
 	public TravellerDocument(DocumentType documentType, String documentNumber, String issuingCountry) {
 		super();
 		this.documentType = documentType;
 		this.documentNumber = documentNumber;
 		this.issuingCountry = issuingCountry;
-	}
-
-	public TravellerDocument() {
-		super();
-	}
-
-	
+	}	
 }
 

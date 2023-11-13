@@ -26,8 +26,14 @@ public interface TravellerRepository extends JpaRepository<Traveller, Long> {
                     @Param("documentType") DocumentType documentType,
                     @Param("documentNumber") String documentNumber,
                     @Param("issuingCountry") String issuingCountry);
-	Traveller findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(String firstName, String lastName,
-			String dateOfBirth, String email, String mobileNumber);
+    @Query("SELECT t FROM Traveller t WHERE t.email = :email AND t.mobileNumber = :mobileNumber" +
+            " AND (:firstName IS NULL OR t.firstName = :firstName)" +
+            " AND (:lastName IS NULL OR t.lastName = :lastName)" +
+            " AND (:dateOfBirth IS NULL OR t.dateOfBirth = :dateOfBirth)")
+    Traveller findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+        @Param("email") String email, @Param("mobileNumber") String mobileNumber,
+        @Param("firstName") String firstName, @Param("lastName") String lastName,
+        @Param("dateOfBirth") String dateOfBirth);
     
 }
     

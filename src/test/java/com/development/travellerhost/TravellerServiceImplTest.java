@@ -91,8 +91,8 @@ class TravellerServiceImplTest {
 	@Test
 	public void deactivateTraveller_Failure() {
 	    // Arrange
-	    when(travellerRepository.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(
-	            "Krishna", "Priya", "1994-04-27", "krishnavaradha@example.com", "1234567890"))
+	    when(travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+	    		"krishnavaradha@example.com", "1234567890","Krishna", "Priya", "1994-04-27"))
 	            .thenReturn(traveller);
 
 	    when(travellerRepository.save(any())).thenAnswer(invocation -> {
@@ -116,8 +116,8 @@ class TravellerServiceImplTest {
 	@Test
 	public void deactivateTraveller_Success() throws TravellerNotFoundException, TravellerAlreadyDeactivatedException {
 		
-	    when(travellerRepository.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(
-	            "Krishna", "Priya", "1994-04-27", "krishnavaradha@example.com", "1234567890"))
+	    when(travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+	    		"krishnavaradha@example.com", "1234567890","Krishna", "Priya", "1994-04-27" ))
 	            .thenReturn(traveller);
 	    when(travellerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 

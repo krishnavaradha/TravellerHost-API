@@ -178,15 +178,13 @@ public class TravellerServiceImpl implements TravellerService {
 				throw new IllegalArgumentException("Email and Mobile Number is mandatory");
 			}
 
-			Traveller traveller = travellerRepository
-					.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(firstName, lastName, dateOfBirth,
-							email, mobileNumber);
-
-			if (traveller==null) {
+			Traveller traveller = travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+					email, mobileNumber, firstName, lastName, dateOfBirth);
+			if (traveller == null) {
 				throw new TravellerNotFoundException("Traveller not found with the given information");
 			}
 
-			if (!traveller.isActive()) {
+			if (!traveller.getActive()) {
 				throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
 			}
 
@@ -210,7 +208,7 @@ public class TravellerServiceImpl implements TravellerService {
 			return travellerRepository
 					.findByEmailAndMobileNumber(newTraveller.getEmail(), newTraveller.getMobileNumber())
 					.map(existing -> {
-						if (!existing.isActive()) {
+						if (!existing.getActive()) {
 							throw new RuntimeException("Deactivated travelers cannot be updated.");
 						}
 
