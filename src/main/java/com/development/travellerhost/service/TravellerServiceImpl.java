@@ -45,13 +45,10 @@ public class TravellerServiceImpl implements TravellerService {
 			if (existingTraveller.isPresent()) {
 				throw new TravellerAlredyExistsException("Traveller alredy exists, Failed to create traveller ");
 			} else {
-
-				// Save the traveler to generate an ID
-				Traveller savedTraveller = travellerRepository.save(traveller);
-
-				// Add the new documents to the existing traveler's documents list
-				traveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
-
+				if (!isCombinationUnique(traveller)) {
+					throw new DuplicateResourceException(
+							"Email, Mobile Number, and Documents combination is not unique in the request.");
+				}
 				// If there's only one document, mark it as active
 				if (traveller.getDocuments().size() == 1) {
 					traveller.getDocuments().iterator().next().setActive(true);
@@ -59,9 +56,9 @@ public class TravellerServiceImpl implements TravellerService {
 					// If there are multiple documents, mark at least one as active
 					markAtLeastOneDocumentAsActive(traveller.getDocuments());
 				}
-
-				// Save the updated documents
-				travellerDocumentRepository.saveAll(traveller.getDocuments());
+				traveller.getDocuments().forEach(document -> document.setTraveller(traveller));
+				// Save the traveler to generate an ID
+				Traveller savedTraveller = travellerRepository.save(traveller);
 
 				// Return the saved traveler
 				return savedTraveller;
@@ -75,7 +72,9 @@ public class TravellerServiceImpl implements TravellerService {
 		}
 	}
 
-	private void updateExistingTraveller(Traveller existing, List<TravellerDocument> newDocuments) {
+	private void updateExistingTraveller(Traveller existing, List<TravellerDocument> newDocuments)
+			throws DuplicateResourceException {
+
 		List<TravellerDocument> updatedDocuments = new ArrayList<>(existing.getDocuments());
 
 		for (TravellerDocument newDocument : newDocuments) {
@@ -100,6 +99,10 @@ public class TravellerServiceImpl implements TravellerService {
 		}
 		// Set the updated documents
 		existing.setDocuments(updatedDocuments);
+		if (!isCombinationUnique(existing)) {
+			throw new DuplicateResourceException(
+					"Email, Mobile Number, and Documents combination is not unique in the request.");
+		}
 		// If there's only one document and none of them are marked as active, set the
 		// first one as active
 		if (updatedDocuments.size() == 1 && !isAtLeastOneDocumentActive(updatedDocuments)) {
@@ -200,10 +203,6 @@ public class TravellerServiceImpl implements TravellerService {
 	public Traveller updateTraveller(Traveller newTraveller)
 			throws TravellerAlreadyDeactivatedException, DuplicateResourceException, TravellerNotFoundException {
 		try {
-			if (!isCombinationUnique(newTraveller)) {
-				throw new DuplicateResourceException(
-						"Email, Mobile Number, and Document combination is not unique in the request.");
-			}
 
 			return travellerRepository
 					.findByEmailAndMobileNumber(newTraveller.getEmail(), newTraveller.getMobileNumber())
@@ -216,7 +215,11 @@ public class TravellerServiceImpl implements TravellerService {
 						existing.setLastName(newTraveller.getLastName());
 						existing.setDateOfBirth(newTraveller.getDateOfBirth());
 
-						updateExistingTraveller(existing, newTraveller.getDocuments());
+						try {
+							updateExistingTraveller(existing, newTraveller.getDocuments());
+						} catch (DuplicateResourceException e) {
+							throw new RuntimeException(e.getMessage());
+						}
 
 						Traveller savedTraveller = travellerRepository.save(existing);
 
