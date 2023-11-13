@@ -9,10 +9,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.development.traveller.customexception.DuplicateResourceException;
 import com.development.traveller.customexception.TravellerAlreadyDeactivatedException;
@@ -31,14 +28,12 @@ public class TravellerServiceImpl implements TravellerService {
 
 	private final TravellerRepository travellerRepository;
 	private final TravellerDocumentRepository travellerDocumentRepository;
-	private final RestTemplate restTemplate;
 
 	@Autowired
 	public TravellerServiceImpl(TravellerRepository travellerRepository,
-			TravellerDocumentRepository travellerDocumentRepository, RestTemplate restTemplate) {
+			TravellerDocumentRepository travellerDocumentRepository) {
 		this.travellerRepository = travellerRepository;
 		this.travellerDocumentRepository = travellerDocumentRepository;
-		this.restTemplate = restTemplate;
 	}
 
 	@Override
@@ -180,19 +175,14 @@ public class TravellerServiceImpl implements TravellerService {
 			String mobileNumber) throws TravellerAlreadyDeactivatedException, TravellerNotFoundException {
 		try {
 			if (email == null || mobileNumber == null) {
-				throw new IllegalArgumentException("Email or Mobile Number is mandatory");
+				throw new IllegalArgumentException("Email and Mobile Number is mandatory");
 			}
-			UriComponentsBuilder builder = UriComponentsBuilder
-					.fromUriString("http://localhost:8080/api/travellers/search").queryParam("firstName", firstName)
-					.queryParam("lastName", lastName).queryParam("dateOfBirth", dateOfBirth).queryParam("email", email)
-					.queryParam("mobileNumber", mobileNumber);
 
-			ResponseEntity<Traveller> responseEntity = restTemplate.getForEntity(builder.toUriString(),
-					Traveller.class);
+			Traveller traveller = travellerRepository
+					.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(firstName, lastName, dateOfBirth,
+							email, mobileNumber);
 
-			Traveller traveller = responseEntity.getBody();
-
-			if (traveller == null) {
+			if (traveller==null) {
 				throw new TravellerNotFoundException("Traveller not found with the given information");
 			}
 

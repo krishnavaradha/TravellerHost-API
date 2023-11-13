@@ -90,7 +90,7 @@ class TravellerServiceImplTest {
 	    // Arrange
 	    when(travellerRepository.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(
 	            "Krishna", "Priya", "1994-04-27", "krishnavaradha@example.com", "1234567890"))
-	            .thenReturn(Collections.singletonList(traveller));
+	            .thenReturn(traveller);
 
 	    when(travellerRepository.save(any())).thenAnswer(invocation -> {
 	        Traveller savedTraveller = invocation.getArgument(0);
@@ -115,7 +115,7 @@ class TravellerServiceImplTest {
 		
 	    when(travellerRepository.findByFirstNameOrLastNameOrDateOfBirthOrEmailAndMobileNumber(
 	            "Krishna", "Priya", "1994-04-27", "krishnavaradha@example.com", "1234567890"))
-	            .thenReturn(Collections.singletonList(traveller));
+	            .thenReturn(traveller);
 	    when(travellerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
 	    Traveller deactivatedTraveller = travellerService.deactivateTraveller(
