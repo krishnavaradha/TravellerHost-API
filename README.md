@@ -13,8 +13,8 @@ Welcome to the Traveller Data Management API! This API allows you to manage trav
 Assumptions :
 
 To get started, ensure you have:
-- H2 database enabled in Server Mode. Refer to [H2 Database Tutorial](https://www.h2database.com/html/tutorial.html) for details.
-- SSL certificates configured, and a client cert set up for mutual TLS from the client.
+- H2 database enabled in Server Mode and not in embedded mode . Refer to [H2 Database Tutorial](https://www.h2database.com/html/tutorial.html) for details.
+- SSL certificates configured, and a client cert/server set up for mutual TLS from the client.For testing please use client.pem, server.pem from SOAPUI/Postman to test.
 - H2 instances and application instances can be scaled up and load-balanced using F5.
 - RestTemplate load-balancing is not required as this is a single microservice without external service calls. Feel free to extend the solution as needed.
 -In all the below endpoints Document Type is restricted to 
@@ -59,7 +59,7 @@ Combination of Email , Mobile Number, Document Type is unique.
 A new traveller can  be created but not updated.
 Email and Mobile number in Travellers table is unique .
 
-Get Traveller
+###Get Traveller
 Retrieve traveller information.
 
 Endpoint: GET /api/travellers/search
@@ -67,7 +67,7 @@ Query Parameters:
 email or mobile or document (optional)
 Note: Only retrieves the active document for a traveller.
 
-Update Traveller
+###Update Traveller
 Update traveller information.
 
 Endpoint: PUT /api/travellers/update
@@ -102,7 +102,7 @@ Note :
 Only existing traveller can be updated, Traveller details will be fetched in the combination of Mobile and email .
 Email and Mobile are unique keys and hence cannot be modified.
 
-Deactivate a traveller.
+###Deactivate a traveller.
 
 Endpoint: PUT /api/travellers/deactivate
 

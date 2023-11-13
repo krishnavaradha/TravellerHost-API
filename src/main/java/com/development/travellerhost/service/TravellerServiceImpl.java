@@ -36,6 +36,7 @@ public class TravellerServiceImpl implements TravellerService {
 		this.travellerDocumentRepository = travellerDocumentRepository;
 	}
 
+	@Transactional
 	@Override
 	public Traveller createTraveller(Traveller traveller) throws TravellerAlredyExistsException {
 		try {
@@ -45,10 +46,7 @@ public class TravellerServiceImpl implements TravellerService {
 			if (existingTraveller.isPresent()) {
 				throw new TravellerAlredyExistsException("Traveller alredy exists, Failed to create traveller ");
 			} else {
-				if (!isCombinationUnique(traveller)) {
-					throw new DuplicateResourceException(
-							"Email, Mobile Number, and Documents combination is not unique in the request.");
-				}
+
 				// If there's only one document, mark it as active
 				if (traveller.getDocuments().size() == 1) {
 					traveller.getDocuments().iterator().next().setActive(true);
@@ -59,17 +57,23 @@ public class TravellerServiceImpl implements TravellerService {
 				traveller.getDocuments().forEach(document -> document.setTraveller(traveller));
 				// Save the traveler to generate an ID
 				Traveller savedTraveller = travellerRepository.save(traveller);
+				if (!isCombinationUnique(traveller)) {
+					throw new DuplicateResourceException(
+							"Documents combination is not unique in the request.Alredy the traveller hold the document");
+				}
 
 				// Return the saved traveler
 				return savedTraveller;
 			}
 		} catch (DataIntegrityViolationException ex) {
-
-			throw new TravellerAlredyExistsException(
-					"Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
-		} catch (Exception ex) {
-			throw new RuntimeException("Failed to create traveler: " + ex.getMessage());
-		}
+		    throw new TravellerAlredyExistsException(
+		            "Mobile number/Email Id already exists. Please use a different mobile number or Email Id."
+		        );
+		    } catch (TravellerAlredyExistsException ex) {
+		        throw ex;
+		    } catch (Exception ex) {
+		        throw new RuntimeException("Failed to create traveler: " + ex.getMessage());
+		    }
 	}
 
 	private void updateExistingTraveller(Traveller existing, List<TravellerDocument> newDocuments)
@@ -131,18 +135,13 @@ public class TravellerServiceImpl implements TravellerService {
 	}
 
 	private boolean isCombinationUnique(Traveller traveller) {
-		Set<String> documentCombinations = new HashSet<>();
-
 		for (TravellerDocument document : traveller.getDocuments()) {
-			String combination = document.getDocumentType() + "-" + document.getDocumentNumber();
+			Optional<TravellerDocument> existingDocument = travellerDocumentRepository
+					.findByDocumentTypeAndDocumentNumberAndIssuingCountryAndTraveller(document.getDocumentType(),
+							document.getDocumentNumber(), document.getIssuingCountry(), traveller);
 
-			if (!documentCombinations.add(combination)) {
+			if (existingDocument.isPresent()) {
 				return false; // Duplicate document combination found
-			}
-
-			if (travellerRepository.existsByEmailAndMobileNumberAndDocumentsId(traveller.getEmail(),
-					traveller.getMobileNumber(), document.getId())) {
-				return false; // Duplicate email, mobile number, and document combination found
 			}
 		}
 
@@ -153,87 +152,74 @@ public class TravellerServiceImpl implements TravellerService {
 	@Transactional()
 	public Traveller searchActiveTravellers(String email, String mobile, DocumentType documentType,
 			String documentNumber, String issuingCountry) throws TravellerNotFoundException {
-		try {
-			if (StringUtils.isAllBlank(email, mobile, documentNumber, issuingCountry) && documentType == null) {
-				throw new IllegalArgumentException(
-						"Email/Mobile/Document Deatils,At least one search criteria must be provided.");
 
-			}
-			// Perform the search for active travelers
-			Traveller traveller = travellerRepository.searchActiveTravellers(email, mobile, documentType,
-					documentNumber, issuingCountry);
-			if (traveller == null || (traveller != null && !traveller.getActive())) {
-				throw new TravellerNotFoundException("Traveller Account is Deactivated or Not Found");
-			}
-			return traveller;
-		} catch (Exception ex) {
-			throw new RuntimeException("Failed to search traveller: " + ex.getMessage());
+		if (StringUtils.isAllBlank(email, mobile, documentNumber, issuingCountry) && documentType == null) {
+			throw new IllegalArgumentException(
+					"Email/Mobile/Document Deatils,At least one search criteria must be provided.");
+
 		}
-
+		// Perform the search for active travelers
+		Traveller traveller = travellerRepository.searchActiveTravellers(email, mobile, documentType, documentNumber,
+				issuingCountry);
+		if (traveller == null || (traveller != null && !traveller.getActive())) {
+			throw new TravellerNotFoundException("Traveller Account is Deactivated or Not Found");
+		}
+		return traveller;
 	}
 
 	@Override
 	@Transactional
 	public Traveller deactivateTraveller(String firstName, String lastName, String dateOfBirth, String email,
 			String mobileNumber) throws TravellerAlreadyDeactivatedException, TravellerNotFoundException {
-		try {
-			if (email == null || mobileNumber == null) {
-				throw new IllegalArgumentException("Email and Mobile Number is mandatory");
-			}
 
-			Traveller traveller = travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
-					email, mobileNumber, firstName, lastName, dateOfBirth);
-			if (traveller == null) {
-				throw new TravellerNotFoundException("Traveller not found with the given information");
-			}
-
-			if (!traveller.getActive()) {
-				throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
-			}
-
-			traveller.setActive(false);
-			return travellerRepository.save(traveller);
-		} catch (Exception ex) {
-			throw new RuntimeException("Failed to deactivate traveller: " + ex.getMessage());
+		if (email == null || mobileNumber == null) {
+			throw new IllegalArgumentException("Email or  Mobile Number is mandatory");
 		}
+
+		Traveller traveller = travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(email,
+				mobileNumber, firstName, lastName, dateOfBirth);
+		if (traveller == null) {
+			throw new TravellerNotFoundException("Traveller not found with the given information");
+		}
+
+		if (!traveller.getActive()) {
+			throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
+		}
+
+		traveller.setActive(false);
+		return travellerRepository.save(traveller);
 	}
 
 	@Override
 	@Transactional
 	public Traveller updateTraveller(Traveller newTraveller)
 			throws TravellerAlreadyDeactivatedException, DuplicateResourceException, TravellerNotFoundException {
-		try {
 
-			return travellerRepository
-					.findByEmailAndMobileNumber(newTraveller.getEmail(), newTraveller.getMobileNumber())
-					.map(existing -> {
-						if (!existing.getActive()) {
-							throw new RuntimeException("Deactivated travelers cannot be updated.");
-						}
+		return travellerRepository.findByEmailAndMobileNumber(newTraveller.getEmail(), newTraveller.getMobileNumber())
+				.map(existing -> {
+					if (!existing.getActive()) {
+						throw new RuntimeException("Deactivated travelers cannot be updated.");
+					}
 
-						existing.setFirstName(newTraveller.getFirstName());
-						existing.setLastName(newTraveller.getLastName());
-						existing.setDateOfBirth(newTraveller.getDateOfBirth());
+					existing.setFirstName(newTraveller.getFirstName());
+					existing.setLastName(newTraveller.getLastName());
+					existing.setDateOfBirth(newTraveller.getDateOfBirth());
 
-						try {
-							updateExistingTraveller(existing, newTraveller.getDocuments());
-						} catch (DuplicateResourceException e) {
-							throw new RuntimeException(e.getMessage());
-						}
+					try {
+						updateExistingTraveller(existing, newTraveller.getDocuments());
+					} catch (DuplicateResourceException e) {
+						throw new RuntimeException(e.getMessage());
+					}
 
-						Traveller savedTraveller = travellerRepository.save(existing);
+					Traveller savedTraveller = travellerRepository.save(existing);
 
-						if (newTraveller.getDocuments() != null) {
-							newTraveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
-							travellerDocumentRepository.saveAll(newTraveller.getDocuments());
-						}
+					if (newTraveller.getDocuments() != null) {
+						newTraveller.getDocuments().forEach(document -> document.setTraveller(savedTraveller));
+						travellerDocumentRepository.saveAll(newTraveller.getDocuments());
+					}
 
-						return savedTraveller;
-					}).orElseThrow(
-							() -> new TravellerNotFoundException("Traveller not found with the provided details."));
-		} catch (Exception ex) {
-			throw new RuntimeException("Failed to update traveller: " + ex.getMessage());
-		}
+					return savedTraveller;
+				}).orElseThrow(() -> new TravellerNotFoundException("Traveller not found with the provided details."));
 	}
 
 }

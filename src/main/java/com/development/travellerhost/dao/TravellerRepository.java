@@ -13,7 +13,8 @@ import com.development.travellerhost.model.Traveller;
 @Repository
 public interface TravellerRepository extends JpaRepository<Traveller, Long> {
     Optional<Traveller> findByEmailAndMobileNumber(String email, String mobileNumber);
-    boolean existsByEmailAndMobileNumberAndDocumentsId(String email, String mobileNumber, Long documentId);
+    boolean existsByEmailAndMobileNumberAndDocuments_DocumentTypeAndDocuments_IssuingCountryAndDocuments_DocumentNumber(
+            String email, String mobileNumber, String documentType, String issuingCountry, String documentNumber);
     @Query("SELECT t FROM Traveller t LEFT JOIN FETCH t.documents d " +
             "WHERE (:email IS NULL OR t.email = :email) " +
             "AND (:mobile IS NULL OR t.mobileNumber = :mobile) " +

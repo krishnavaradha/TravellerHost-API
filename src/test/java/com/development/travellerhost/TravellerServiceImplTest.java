@@ -69,48 +69,34 @@ class TravellerServiceImplTest {
 	}
 
 	@Test
-	void testCreateTravellerWithExistingTraveller() throws TravellerAlredyExistsException {
+	void testCreateTravellerWithExistingTraveller() {
+	    Traveller existingTraveller = createSampleTraveller();
+	    traveller.setId(1L);
 
-		Traveller existingTraveller = createSampleTraveller();
-		existingTraveller.setId(1L);
+	    when(travellerRepository.findByEmailAndMobileNumber(any(), any())).thenReturn(Optional.of(existingTraveller));
+	    when(travellerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-		when(travellerRepository.findByEmailAndMobileNumber(any(), any())).thenReturn(Optional.of(existingTraveller));
-		when(travellerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-		Traveller updatedTraveller = travellerService.createTraveller(traveller);
-
-		assertNotNull(updatedTraveller);
-		assertEquals(existingTraveller.getId(), updatedTraveller.getId());
-		assertEquals(traveller.getFirstName(), updatedTraveller.getFirstName());
-		assertEquals(traveller.getLastName(), updatedTraveller.getLastName());
-		assertEquals(traveller.getDateOfBirth(), updatedTraveller.getDateOfBirth());
-		assertEquals(2, updatedTraveller.getDocuments().size());
-		assertTrue(updatedTraveller.getDocuments().get(0).isActive());
+	    assertThrows(TravellerAlredyExistsException.class, () -> {
+	        travellerService.createTraveller(traveller);
+	    });
 	}
 
 	@Test
-	public void deactivateTraveller_Failure() {
-	    // Arrange
+	void testDeactivateTraveller_AlreadyDeactivated1() {
+	   
+	    Traveller deactivatedTraveller = createSampleTraveller();
+	    deactivatedTraveller.setActive(false);
+
 	    when(travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
-	    		"krishnavaradha@example.com", "1234567890","Krishna", "Priya", "1994-04-27"))
-	            .thenReturn(traveller);
+	            anyString(), anyString(), anyString(), anyString(), anyString()))
+	            .thenReturn(deactivatedTraveller);
 
-	    when(travellerRepository.save(any())).thenAnswer(invocation -> {
-	        Traveller savedTraveller = invocation.getArgument(0);
-	        if (!savedTraveller.getActive()) {
-	            throw new TravellerAlreadyDeactivatedException("Traveller already deactivated");
-	        }
+	    TravellerAlreadyDeactivatedException exception = assertThrows(TravellerAlreadyDeactivatedException.class, () ->
+	            travellerService.deactivateTraveller("Krishna", "Priya", "1994-04-27",
+	                    "krishnavaradha@example.com", "1234567890"));
 
-	        return savedTraveller;
-	    });
-
-	    TravellerAlreadyDeactivatedException exception = assertThrows(
-	            TravellerAlreadyDeactivatedException.class,
-	            () -> travellerService.deactivateTraveller(
-	                    "Krishna", "Priya", "1994-04-27", "krishnavaradha@example.com", "1234567890")
-	    );
-
-	    assertEquals("Traveller already deactivated", exception.getMessage());
+	    // Check if the exception message contains the expected message
+	    assertTrue(exception.getMessage().contains("Traveller is already deactivated"));
 	}
 
 	@Test
@@ -128,22 +114,21 @@ class TravellerServiceImplTest {
 	}
 	@Test
 	void createTraveller_DataIntegrityViolationException() {
-	    // Arrange
-	    Traveller traveller = createSampleTraveller();
-	    when(travellerRepository.findByEmailAndMobileNumber(anyString(), anyString())).thenReturn(Optional.empty());
-	    when(travellerRepository.save(any(Traveller.class))).thenThrow(DataIntegrityViolationException.class);
-
-	    // Act & Assert
+	    
+	   
+	    when(travellerRepository.findByEmailAndMobileNumber(any(), any())).thenReturn(Optional.empty());
+		when(travellerRepository.save(any())).thenThrow(DataIntegrityViolationException.class);
+	    
 	    TravellerAlredyExistsException exception = assertThrows(TravellerAlredyExistsException.class, () -> travellerService.createTraveller(traveller));
 	    assertEquals("Mobile number/Email Id already exists. Please use a different mobile number or Email Id.", exception.getMessage());
 	}
 	@Test
     void searchActiveTravellers_TravellerNotFoundException() {
-        // Arrange
+       
         when(travellerRepository.searchActiveTravellers(anyString(), anyString(), any(DocumentType.class), anyString(), anyString()))
                 .thenReturn(null);
 
-        // Act & Assert
+        
         assertThrows(TravellerNotFoundException.class, () ->
                 travellerService.searchActiveTravellers("krishnavaradha@example.com", "1234567890", DocumentType.PASSPORT, "AB123", "Country"));
     }
@@ -171,6 +156,31 @@ class TravellerServiceImplTest {
 		traveller.setMobileNumber("1234567890");
 		return traveller;
 	}
+	@Test
+    void testDeactivateTraveller_TravellerNotFound() {
+       
+        when(travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+                anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(null);
+
+        
+        assertThrows(TravellerNotFoundException.class, () ->
+                travellerService.deactivateTraveller("Krishna", "Priya", "1994-04-27",
+                        "krishnavaradha@example.com", "1234567890"));
+    }
+	
+	@Test
+    void testDeactivateTraveller_ExceptionThrown() {
+       
+        when(travellerRepository.findByEmailAndMobileNumberAndFirstNameAndLastNameAndDateOfBirth(
+                anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(DataIntegrityViolationException.class);
+
+        
+        assertThrows(RuntimeException.class, () ->
+                travellerService.deactivateTraveller("Krishna", "Priya", "1994-04-27",
+                        "krishnavaradha@example.com", "1234567890"));
+    }
 
 	private List<TravellerDocument> createSampleDocuments() {
 		TravellerDocument document1 = new TravellerDocument();
@@ -185,4 +195,15 @@ class TravellerServiceImplTest {
 
 		return List.of(document1, document2);
 	}
+	private Traveller createSampleTraveller1() {
+        Traveller traveller = new Traveller();
+        traveller.setId(1L);
+        traveller.setFirstName("Krishna");
+        traveller.setLastName("Priya");
+        traveller.setDateOfBirth("1994-04-27");
+        traveller.setEmail("krishnavaradha@example.com");
+        traveller.setMobileNumber("1234567890");
+        traveller.setActive(true);
+        return traveller;
+    }
 }
