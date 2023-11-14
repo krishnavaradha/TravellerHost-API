@@ -102,6 +102,7 @@ Note :
 
 Only existing traveller can be updated, Traveller details will be fetched in the combination of Mobile and email .
 Email and Mobile are unique keys and hence cannot be modified.
+Traveller is fetched with Email and Mobile number.
 
 ###Deactivate a traveller.
 
