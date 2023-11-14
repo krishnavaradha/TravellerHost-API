@@ -21,6 +21,7 @@ To get started, ensure you have:
 	PASSPORT("Passport"),
     ID_CARD("ID Card"),
     DRIVER_LICENSE("Driver's License");
+-Lombok is used for generating Getters and Setters.
     
 ## API Endpoints
 

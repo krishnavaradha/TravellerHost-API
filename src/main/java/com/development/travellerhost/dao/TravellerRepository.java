@@ -35,6 +35,7 @@ public interface TravellerRepository extends JpaRepository<Traveller, Long> {
         @Param("email") String email, @Param("mobileNumber") String mobileNumber,
         @Param("firstName") String firstName, @Param("lastName") String lastName,
         @Param("dateOfBirth") String dateOfBirth);
+	boolean existsByEmailAndMobileNumber(String email, String mobileNumber);
     
 }
     

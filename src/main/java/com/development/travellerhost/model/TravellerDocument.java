@@ -2,6 +2,7 @@ package com.development.travellerhost.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -23,7 +24,9 @@ public class TravellerDocument {
     private Long id;
     @Enumerated(EnumType.STRING)
     private DocumentType documentType;
+    @Column(nullable = false, unique = true)
     private String documentNumber;
+    @Column(nullable = false)
     private String issuingCountry;
     private boolean active;
     @JsonIgnore

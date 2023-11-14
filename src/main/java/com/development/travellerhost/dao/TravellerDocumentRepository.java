@@ -11,7 +11,10 @@ import com.development.travellerhost.model.TravellerDocument;
 
 @Repository
 public interface TravellerDocumentRepository extends JpaRepository<TravellerDocument, Long> {
-	 Optional<TravellerDocument> findByDocumentTypeAndDocumentNumberAndIssuingCountryAndTraveller(
-		        DocumentType documentType, String documentNumber, String issuingCountry, Traveller traveller);
+	 
+		boolean existsByDocumentTypeAndDocumentNumberAndIssuingCountry(DocumentType documentType, String documentNumber,
+				String issuingCountry);
 
-}
+		boolean existsByDocumentTypeAndDocumentNumberAndIssuingCountryAndTraveller(DocumentType documentType,
+				String documentNumber, String issuingCountry, Traveller traveller);
+	}

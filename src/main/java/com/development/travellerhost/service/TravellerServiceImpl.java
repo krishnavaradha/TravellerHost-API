@@ -24,6 +24,7 @@ import com.development.travellerhost.model.TravellerDocument;
 import jakarta.transaction.Transactional;
 
 @Service
+@Transactional
 public class TravellerServiceImpl implements TravellerService {
 
 	private final TravellerRepository travellerRepository;
@@ -36,51 +37,65 @@ public class TravellerServiceImpl implements TravellerService {
 		this.travellerDocumentRepository = travellerDocumentRepository;
 	}
 
-	@Transactional
 	@Override
 	public Traveller createTraveller(Traveller traveller) throws TravellerAlredyExistsException {
 		try {
 			Optional<Traveller> existingTraveller = travellerRepository.findByEmailAndMobileNumber(traveller.getEmail(),
 					traveller.getMobileNumber());
-
 			if (existingTraveller.isPresent()) {
-				throw new TravellerAlredyExistsException("Traveller alredy exists, Failed to create traveller ");
+				throw new TravellerAlredyExistsException("Traveller already exists. Failed to create new traveller.");
 			} else {
 
-				// If there's only one document, mark it as active
-				if (traveller.getDocuments().size() == 1) {
-					traveller.getDocuments().iterator().next().setActive(true);
-				} else {
-					// If there are multiple documents, mark at least one as active
-					markAtLeastOneDocumentAsActive(traveller.getDocuments());
-				}
-				traveller.getDocuments().forEach(document -> document.setTraveller(traveller));
-				// Save the traveler to generate an ID
-				Traveller savedTraveller = travellerRepository.save(traveller);
-				if (!isCombinationUnique(traveller)) {
-					throw new DuplicateResourceException(
-							"Documents combination is not unique in the request.Alredy the traveller hold the document");
-				}
+				checkForDuplicateDocuments(traveller);
 
-				// Return the saved traveler
+				handleDocumentActivation(traveller);
+
+				traveller.getDocuments().forEach(document -> document.setTraveller(traveller));
+				Traveller savedTraveller = travellerRepository.save(traveller);
+
 				return savedTraveller;
 			}
-		} catch (DataIntegrityViolationException ex) {
-		    throw new TravellerAlredyExistsException(
-		            "Mobile number/Email Id already exists. Please use a different mobile number or Email Id."
-		        );
-		    } catch (TravellerAlredyExistsException ex) {
-		        throw ex;
-		    } catch (Exception ex) {
-		        throw new RuntimeException("Failed to create traveler: " + ex.getMessage());
-		    }
+		} catch (Exception ex) {
+			if (ex instanceof DataIntegrityViolationException) {
+				throw new DataIntegrityViolationException(
+						"Mobile number/Email Id already exists. Please use a different mobile number or Email Id.");
+			} else {
+				throw new RuntimeException("Failed to create traveller: " + ex.getMessage(), ex);
+			}
+		}
+	}
+
+	private void checkForDuplicateDocuments(Traveller traveller) throws DuplicateResourceException {
+		Set<String> documentCombinations = new HashSet<>();
+
+		for (TravellerDocument document : traveller.getDocuments()) {
+			String combination = document.getDocumentType() + "_" + document.getDocumentNumber() + "_"
+					+ document.getIssuingCountry();
+
+			if (!documentCombinations.add(combination)) {
+				throw new DuplicateResourceException("Duplicate document combination found in the request.");
+			}
+			boolean uniqueDocumentCombination = !travellerDocumentRepository
+					.existsByDocumentTypeAndDocumentNumberAndIssuingCountry(document.getDocumentType(),
+							document.getDocumentNumber(), document.getIssuingCountry());
+
+			if (!uniqueDocumentCombination) {
+				// Duplicate document combination found for another traveler
+				throw new DuplicateResourceException("Duplicate document combination found.");
+			}
+
+		}
+
 	}
 
 	private void updateExistingTraveller(Traveller existing, List<TravellerDocument> newDocuments)
 			throws DuplicateResourceException {
 
 		List<TravellerDocument> updatedDocuments = new ArrayList<>(existing.getDocuments());
-
+		if (!isCombinationUnique(existing, newDocuments)) {
+			throw new DuplicateResourceException(
+					" Documents combination is not unique in the request.It is alredy assigned to the same traveller.");
+		}
 		for (TravellerDocument newDocument : newDocuments) {
 			Optional<TravellerDocument> existingDocumentOpt = existing.getDocuments().stream()
 					.filter(doc -> doc.getDocumentType().equals(newDocument.getDocumentType())
@@ -103,10 +118,7 @@ public class TravellerServiceImpl implements TravellerService {
 		}
 		// Set the updated documents
 		existing.setDocuments(updatedDocuments);
-		if (!isCombinationUnique(existing)) {
-			throw new DuplicateResourceException(
-					"Email, Mobile Number, and Documents combination is not unique in the request.");
-		}
+
 		// If there's only one document and none of them are marked as active, set the
 		// first one as active
 		if (updatedDocuments.size() == 1 && !isAtLeastOneDocumentActive(updatedDocuments)) {
@@ -115,6 +127,14 @@ public class TravellerServiceImpl implements TravellerService {
 			deactivateOtherDocumentsForTraveler(existing, updatedDocuments);
 		} else {
 			markAtLeastOneDocumentAsActive(updatedDocuments);
+		}
+	}
+
+	private void handleDocumentActivation(Traveller traveller) throws DuplicateResourceException {
+		if (traveller.getDocuments().size() == 1) {
+			traveller.getDocuments().iterator().next().setActive(true);
+		} else {
+			markAtLeastOneDocumentAsActive(traveller.getDocuments());
 		}
 	}
 
@@ -134,14 +154,17 @@ public class TravellerServiceImpl implements TravellerService {
 		}
 	}
 
-	private boolean isCombinationUnique(Traveller traveller) {
-		for (TravellerDocument document : traveller.getDocuments()) {
-			Optional<TravellerDocument> existingDocument = travellerDocumentRepository
-					.findByDocumentTypeAndDocumentNumberAndIssuingCountryAndTraveller(document.getDocumentType(),
+	private boolean isCombinationUnique(Traveller traveller, List<TravellerDocument> documents) {
+		for (TravellerDocument document : documents) {
+
+			// Check if the same combination is assigned to the same traveler
+			boolean sameCombinationAssignedToSameTraveller = travellerDocumentRepository
+					.existsByDocumentTypeAndDocumentNumberAndIssuingCountryAndTraveller(document.getDocumentType(),
 							document.getDocumentNumber(), document.getIssuingCountry(), traveller);
 
-			if (existingDocument.isPresent()) {
-				return false; // Duplicate document combination found
+			if (sameCombinationAssignedToSameTraveller) {
+				// Same document combination is already assigned to the same traveler
+				return false;
 			}
 		}
 
@@ -149,7 +172,6 @@ public class TravellerServiceImpl implements TravellerService {
 	}
 
 	@Override
-	@Transactional()
 	public Traveller searchActiveTravellers(String email, String mobile, DocumentType documentType,
 			String documentNumber, String issuingCountry) throws TravellerNotFoundException {
 
@@ -168,7 +190,6 @@ public class TravellerServiceImpl implements TravellerService {
 	}
 
 	@Override
-	@Transactional
 	public Traveller deactivateTraveller(String firstName, String lastName, String dateOfBirth, String email,
 			String mobileNumber) throws TravellerAlreadyDeactivatedException, TravellerNotFoundException {
 
@@ -182,19 +203,23 @@ public class TravellerServiceImpl implements TravellerService {
 			throw new TravellerNotFoundException("Traveller not found with the given information");
 		}
 
-		if (!traveller.getActive()) {
-			throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
-		}
+		checkIfAlreadyDeactivated(traveller);
 
 		traveller.setActive(false);
 		return travellerRepository.save(traveller);
 	}
 
+	// method to check if a traveler is already deactivated
+	private void checkIfAlreadyDeactivated(Traveller traveller) throws TravellerAlreadyDeactivatedException {
+		if (!traveller.getActive()) {
+			throw new TravellerAlreadyDeactivatedException("Traveller is already deactivated");
+		}
+	}
+
 	@Override
-	@Transactional
 	public Traveller updateTraveller(Traveller newTraveller)
 			throws TravellerAlreadyDeactivatedException, DuplicateResourceException, TravellerNotFoundException {
-
+		checkForDuplicateDocuments(newTraveller);
 		return travellerRepository.findByEmailAndMobileNumber(newTraveller.getEmail(), newTraveller.getMobileNumber())
 				.map(existing -> {
 					if (!existing.getActive()) {
